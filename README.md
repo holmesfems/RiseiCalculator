@@ -38,5 +38,11 @@ Yは消費理性なので値が固定されます。二次項を無視して変�
 
 両方に分散を求める場合、Xの分散は以下の式となる
 
-<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;V(\varepsilon_X)=(A^{-1})^{\odot&space;2}\cdot\varepsilon_A\cdot&space;X^{\odot&space;2}" title="\bg_white V(\varepsilon_X)=(A^{-1})^{\odot 2}\cdot\varepsilon_A\cdot X^{\odot 2}" />
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;V(\varepsilon_X)=(A^{-1})^{\odot&space;2}\cdot&space;V(\varepsilon_A)\cdot&space;X^{\odot&space;2}" title="\bg_white V(\varepsilon_X)=(A^{-1})^{\odot 2}\cdot V(\varepsilon_A)\cdot X^{\odot 2}" />
 
+このうち、☉はアダマール冪を表す(要素毎にべき乗する)
+Aの分散は、ドロップ数が二種類しか出ない場合、統計のサンプル数から算出できる。
+
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;V(\varepsilon_A)&space;=&space;\frac{P(1-P)}{Times}" title="\bg_white V(\varepsilon_A) = \frac{P(1-P)}{Times}" />
+
+Pはドロップ率の小数部分の値を代入する。実際はドロップ数が0,1,2などが存在するが、ドロップ率が100%を下回る素材はドロップ数が2となるのは非常にまれであること、100%を超える素材は理性価値自体が低いことから、この近似は合理的と言える。
