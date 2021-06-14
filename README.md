@@ -25,4 +25,4 @@ ConvertionDR: the rate of outcome materials, default is 0.18
 基準ステージでは、各素材のドロップ率と理性価値を掛けた合計が、ステージの消費理性と同等の値とします。
 加工所の加工では、加工前後の合計理性価値は変動しないものとすれば、これを元に連立方程式を立てることが出来、これを解けば各素材の理性価値が求められます。
 
-<img src="https://latex.codecogs.com/svg.image?AX=Y&space;" title="AX=Y " />
+<img src="https://latex.codecogs.com/gif.image?\dpi{100}&space;AX=Y&space;" title="AX=Y " />
