@@ -5,6 +5,8 @@ from scipy.optimize import linprog
 from collections import defaultdict as ddict
 import random
 import pandas as pd
+import math
+import datetime
 
 global penguin_url, headers, LanguageMap
 penguin_url = 'https://penguin-stats.io/PenguinStats/api/v2/'
@@ -194,7 +196,8 @@ class RiseiCalculator(object):
         arr[self.name_to_index["技巧概要·卷3"]] = -1-self.ConvertionDR
         arraylist.append(arr)
 
-        return (np.array(arraylist),np.zeros(len(arraylist)))
+        divlist = np.zeros(shape=(len(arraylist),self.TotalCount))
+        return (np.array(arraylist),np.zeros(len(arraylist)),divlist)
     
     def _GetConstStageMatrix(self):
         arraylist = []
@@ -223,7 +226,8 @@ class RiseiCalculator(object):
         arraylist.append(arr)
         riseilist.append(30)
         
-        return (np.array(arraylist),np.array(riseilist))
+        divlist = np.zeros(shape=(len(arraylist),self.TotalCount))
+        return (np.array(arraylist),np.array(riseilist),divlist)
 
     def _getValidStageList(self):
         #ステージのカテゴリ化
@@ -231,7 +235,7 @@ class RiseiCalculator(object):
         #'Stages' 'Items'の他に、試行回数条件を満たしたステージIdのみを入れる'ValidIds'も追加される
         self.stage_Category_dict = {
             '源岩':{
-                'Stages':['R8-3','4-6','7-2','6-5','5-1','2-4','S2-12','S3-7','5-10','S5-1','S6-2','1-7','7-16'], \
+                'Stages':['R8-3','4-6','7-2','6-5','5-1','2-4','S2-12','S3-7','5-10','S5-1','S6-2','1-7','7-16','7-6'], \
                 'Items':['源岩', '固源岩', '固源岩组', '提纯源岩'] 
             },
             '装置':{
@@ -243,7 +247,7 @@ class RiseiCalculator(object):
                 'Items':['酯原料', '聚酸酯', '聚酸酯组', '聚酸酯块']
             },
             '糖':{
-                'Stages':['5-2','4-2','M8-7','7-12','6-3','2-5'],
+                'Stages':['5-2','4-2','M8-7','7-12','6-3','2-5','7-6'],
                 'Items':['代糖', '糖', '糖组', '糖聚块']
             },
             '异铁':{
@@ -302,17 +306,25 @@ class RiseiCalculator(object):
                 #initialize
                 stage_info = {}
                 stage_info["array"] = np.zeros(self.TotalCount)
+                stage_info["divArray"] = np.zeros(self.TotalCount)
                 #print(item["stageId"])
                 stage_info["apCost"] = [x["apCost"] for x in self.stages if x["stageId"] == item["stageId"]][0]
                 stage_info["name"] = self.stageId_to_name[item["stageId"]]
                 stage_info["array"][self.name_to_index["龙门币1000"]] = stage_info["apCost"] *0.012
                 stage_info["minTimes"] = 0
                 stage_dict[item["stageId"]] = stage_info
-            stage_dict[item["stageId"]]["array"][self.id_to_index[item["itemId"]]] += item["quantity"]/item["times"]
-            if stage_dict[item["stageId"]]["minTimes"] == 0 or item["times"] < stage_dict[item["stageId"]]["minTimes"]:
-                stage_dict[item["stageId"]]["minTimes"] = item["times"]
+            if item["times"] >= self.minTimes:
+                prob = item["quantity"]/item["times"]
+                fprob = math.modf(prob)[0]
+                stage_dict[item["stageId"]]["array"][self.id_to_index[item["itemId"]]] += prob
+                #ドロップ数が二種類しか出ない仮定
+                stage_dict[item["stageId"]]["divArray"][self.id_to_index[item["itemId"]]] += fprob*(1 - fprob) / item["times"]
+
+                if stage_dict[item["stageId"]]["minTimes"] == 0 or item["times"] < stage_dict[item["stageId"]]["minTimes"]:
+                    stage_dict[item["stageId"]]["minTimes"] = item["times"]
         #print(stage_dict)
         #試行回数条件を満たしているステージのみ出力&Id順にソートしておく
+        self.stage_dict_all = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0])}
         self.stage_dict = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0]) if value["minTimes"] >= self.minTimes}
         self.valid_stages = list(self.stage_dict.keys())
         self.valid_stages_getindex = {x:self.valid_stages.index(x) for x in self.valid_stages}
@@ -325,10 +337,12 @@ class RiseiCalculator(object):
     def _getStageMatrix(self,seeds):
         arraylist = []
         riseilist = []
+        divlist = []
         for index in seeds:
             arraylist.append(self.stage_dict[self.valid_stages[index]]["array"])
             riseilist.append(self.stage_dict[self.valid_stages[index]]["apCost"])
-        return (np.array(arraylist),np.array(riseilist))
+            divlist.append(self.stage_dict[self.valid_stages[index]]["divArray"])
+        return (np.array(arraylist),np.array(riseilist),np.array(divlist))
     
     def _detMatrix(self,vstackTuple):
         return LA.det(np.vstack(vstackTuple))
@@ -340,19 +354,50 @@ class RiseiCalculator(object):
         #線型方程式で理性価値を解く
         return LA.solve(np.vstack(vstackTuple),np.concatenate(riseiArrayList))
 
+    def _getMaterialDiv(self,vstackTuple,divStackTuple,metarialValues):
+        probMatrix = np.vstack(vstackTuple)
+        probMatrix_inv = np.linalg.inv(probMatrix)
+        #probMatrix_invSquare = np.dot(probMatrix_inv,probMatrix_inv)
+        #riseiArray = np.concatenate(riseiArrayList)
+        divMatrix = np.vstack(divStackTuple)
+        #print(divMatrix.tolist())
+        div_X = np.dot(np.dot(probMatrix_inv**2,divMatrix),metarialValues**2)
+        
+        return div_X
+    
+    def _divToSD95(self,xDivArray):
+        return xDivArray**0.5*2
+
     def _getStageValues(self,valueArray):
         #解いた理性価値を使い、ステージごとの理性効率を求める
         #理性効率=Sum(理性価値×ドロ率)/理性消費
         #効率が1より上回るステージがあれば、まだ最適ではないと言える
         return {x:np.dot(valueArray,self.stage_dict[x]["array"].T)/self.stage_dict[x]["apCost"] for x in self.valid_stages}
     
+    def _getStageValueSD95(self,vstackTuple,divStackTuple,valueArray,seeds):
+        probMatrix = np.vstack(vstackTuple)
+        probMatrix_inv = np.linalg.inv(probMatrix)
+        #probMatrix_invSquare = np.dot(probMatrix_inv,probMatrix_inv)
+        #riseiArray = np.concatenate(riseiArrayList)
+        divMatrix = np.vstack(divStackTuple)
+        res = {}
+        for x in self.valid_stages:
+            if self.valid_stages_getindex[x] in seeds:
+                res[x] = 0.0
+            else:
+            #stageArray = self.stage_dict[x]["array"]
+                stageDiv = self.stage_dict[x]["divArray"]
+                stageArr = self.stage_dict[x]["array"]
+                res[x] = (np.dot(stageDiv,valueArray**2)+np.dot(np.dot(np.dot(stageArr,probMatrix_inv)**2,divMatrix),valueArray**2))**0.5/self.stage_dict[x]["apCost"]*2
+        return res
+        
     def _getCategoryFromStageId(self,stageId):
         return [x for x in self.stage_Category_keys if stageId in self.stage_Category_dict[x]['ValidIds']]
 
     def Calc(self):
         self._GetMatrixNFormula()
-        ConvertionMatrix,ConvertionRisei = self._GetConvertionMatrix()
-        ConstStageMatrix,ConstStageRisei = self._GetConstStageMatrix()
+        ConvertionMatrix,ConvertionRisei,ConvertionDiv = self._GetConvertionMatrix()
+        ConstStageMatrix,ConstStageRisei,ConstStageDiv = self._GetConstStageMatrix()
         #print(self.matrix)
         self._getValidStageList()
         #print(self.stage_dict)
@@ -368,7 +413,7 @@ class RiseiCalculator(object):
             for i in range(stages_need):
                 randomStageId = random.choice(self.stage_Category_dict[self.stage_Category_keys[i]]["ValidIds"])
                 seeds[i] = self.valid_stages_getindex[randomStageId]
-            stageMatrix, stageRisei = self._getStageMatrix(seeds)
+            stageMatrix, stageRisei,stageDiv = self._getStageMatrix(seeds)
             det = self._detMatrix((ConvertionMatrix,ConstStageMatrix,stageMatrix))
         
         print("Seed Stages:",self._seed2StageName(seeds),"det=",det)
@@ -398,7 +443,7 @@ class RiseiCalculator(object):
                 targetIndex = self.stage_Category_keys.index(item)
                 newSeeds[targetIndex] = self.valid_stages_getindex[maxValue[0]]
                 #print(newSeeds)
-                newMatrix,newRisei = self._getStageMatrix(newSeeds)
+                newMatrix,newRisei,newDiv = self._getStageMatrix(newSeeds)
                 det = self._detMatrix((ConvertionMatrix,ConstStageMatrix,newMatrix))
                 #print(det)
                 if(abs(det) < 1):
@@ -416,18 +461,28 @@ class RiseiCalculator(object):
             maxValue = best_maxValue[1]
         #最適なseedを使い再度効率計算
         #場合によっては無駄になるけど考えるのがめんどくさくなったから計算の暴力で
-        stageMatrix, stageRisei = self._getStageMatrix(seeds)
+        stageMatrix, stageRisei,stageDiv = self._getStageMatrix(seeds)
         seedValues = self._getValues((ConvertionMatrix,ConstStageMatrix,stageMatrix),[ConvertionRisei,ConstStageRisei,stageRisei])
         stageValues = self._getStageValues(seedValues)
 
-        name_to_Value = {self.ValueTarget[x]:seedValues[x] for x in range(self.TotalCount)}
+        #誤差項計算
+        xDivs = self._getMaterialDiv((ConvertionMatrix,ConstStageMatrix,stageMatrix),(ConvertionDiv,ConstStageDiv,stageDiv),seedValues)
+        xSD95 = self._divToSD95(xDivs)
+        stageSD95 = self._getStageValueSD95((ConvertionMatrix,ConstStageMatrix,stageMatrix),(ConvertionDiv,ConstStageDiv,stageDiv),seedValues,seeds)
+        name_to_Value = {self.ValueTarget[x]:(seedValues[x],xSD95[x]) for x in range(self.TotalCount)}
         
         print("*******計算結果*********")
         print("基準マップ一覧:",{self.stage_Category_keys[x]:self._seed2StageName(seeds)[x] for x in range(stages_need)})
-        print("理性価値一覧:",name_to_Value)
-        print("各マップの理性効率:",{self.stageId_to_name[key]:value for key,value in stageValues.items()})
+        #print("基準マップ分散:")
+        #for i in range(len(self.stage_Category_keys)):
+        #    print("{0} : {1}".format(self.stage_Category_keys[i],stageDiv[i]))
+        print("理性価値一覧:")
+        for key,value in name_to_Value.items():
+            print("{0}:{1} ± {2}".format(key,value[0],value[1]))
+        print("各マップの理性効率:",{self.stageId_to_name[key]:(value,stageSD95[key]) for key,value in stageValues.items()})
         
         sorted_stageValues = sorted(stageValues.items(),key=lambda x:x[1],reverse=True)
+        print("\n***********************\n")
         #print(sorted_stageValues)
         print("カテゴリ別効率順:")
         for category in self.stage_Category_keys:
@@ -441,6 +496,7 @@ class RiseiCalculator(object):
                 print("最小試行数:",self.stage_dict[item[0]]["minTimes"])
                 print("理性消費:",self.stage_dict[item[0]]["apCost"])
                 print("理性効率:",item[1])
+                print("95%信頼区間(2σ):",stageSD95[item[0]])
                 print("主素材効率:",np.dot(targetItemValues,self.stage_dict[item[0]]["array"][targetItemIndex])/self.stage_dict[item[0]]["apCost"])
                 print("昇進効率:",np.dot(exclude_Videos_Values,self.stage_dict[item[0]]["array"][4:])/self.stage_dict[item[0]]["apCost"])
                 #print(targetItemValues)
@@ -455,9 +511,12 @@ class RiseiCalculator(object):
             'RMA70-12','凝胶','炽合金',
             '晶体元件'
         ]
-        ticket_efficiency2 = {x:name_to_Value[x]/Price[x] for x in Item_rarity2}
-        ticket_efficiency2_sorted = {key:value for key,value in sorted(ticket_efficiency2.items(),key=lambda x:x[1],reverse=True)}
-        print("初級資格証効率：",ticket_efficiency2_sorted)
+        ticket_efficiency2 = {x:name_to_Value[x][0]/Price[x] for x in Item_rarity2}
+        ticket_efficiency2_sorted = {key:(value,xSD95[self.name_to_index[key]]/Price[key]) for key,value in sorted(ticket_efficiency2.items(),key=lambda x:x[1],reverse=True)}
+        print("初級資格証効率：")
+        for key,value in ticket_efficiency2_sorted.items():
+            print("{0}:\t{1} ± {2}".format(key,value[0],value[1]))
+            
         #上級資格証
         Item_rarity3 = [
             '提纯源岩','改量装置','聚酸酯块', 
@@ -466,11 +525,14 @@ class RiseiCalculator(object):
             'RMA70-24','聚合凝胶','炽合金块',
             '晶体电路'
         ]
-        ticket_efficiency3 = {x:name_to_Value[x]/Price[x] for x in Item_rarity3}
-        ticket_efficiency3_sorted = {key:value for key,value in sorted(ticket_efficiency3.items(),key=lambda x:x[1],reverse=True)}
-        print("上級資格証効率：",ticket_efficiency3_sorted)
+        ticket_efficiency3 = {x:name_to_Value[x][0]/Price[x] for x in Item_rarity3}
+        ticket_efficiency3_sorted = {key:(value,xSD95[self.name_to_index[key]]/Price[key]) for key,value in sorted(ticket_efficiency3.items(),key=lambda x:x[1],reverse=True)}
+        print("")
+        print("上級資格証効率：")
+        for key,value in ticket_efficiency3_sorted.items():
+            print("{0}:\t{1} ± {2}".format(key,value[0],value[1]))
         
-
+        print("\n作成時間:\t{0}".format(datetime.datetime.now()))
         #メインデータの書き出し
         Columns_Name = self.ValueTarget + ['理性消費']
         Rows_Name_Convertion = ['経験値換算1','経験値換算2','経験値換算3','純金換算'] +\
@@ -488,7 +550,7 @@ class RiseiCalculator(object):
         print("基準マップデータをBaseStages.csvに保存しました")
 
 def main():
-    rc = RiseiCalculator(minTimes=1000)
+    rc = RiseiCalculator(minTimes=800)
     rc.Calc()
     #print(rc.convert_rules)
 
