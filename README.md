@@ -26,3 +26,12 @@ ConvertionDR: the rate of outcome materials, default is 0.18
 加工所の加工では、加工前後の合計理性価値は変動しないものとすれば、これを元に連立方程式を立てることが出来、これを解けば各素材の理性価値が求められます。
 
 <img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;AX=Y&space;" title="\bg_white AX=Y " />
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;X=A^{-1}Y" title="\bg_white X=A^{-1}Y" />
+
+ここにAに揺らぎが生じるとして、εAを入れることで、解となるXにも対応する揺らぎεXが生じます
+
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;(A&plus;\epsilon_A)(X&plus;\epsilon_X)=Y" title="\bg_white (A+\epsilon_A)(X+\epsilon_X)=Y" />
+
+Yは消費理性なので値が固定されます。二次項を無視して変形すると、
+
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;\epsilon_X=-A^{-1}\epsilon_AX=-A^{-1}\epsilon_AA^{-1}Y" title="\bg_white \epsilon_X=-A^{-1}\epsilon_AX=-A^{-1}\epsilon_AA^{-1}Y" />
