@@ -30,8 +30,13 @@ ConvertionDR: the rate of outcome materials, default is 0.18
 
 ここにAに揺らぎが生じるとして、εAを入れることで、解となるXにも対応する揺らぎεXが生じます
 
-<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;(A&plus;\epsilon_A)(X&plus;\epsilon_X)=Y" title="\bg_white (A+\epsilon_A)(X+\epsilon_X)=Y" />
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;(A&plus;\varepsilon_A)(X&plus;\varepsilon_X)=Y"/>
 
 Yは消費理性なので値が固定されます。二次項を無視して変形すると、
 
-<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;\epsilon_X=-A^{-1}\epsilon_AX=-A^{-1}\epsilon_AA^{-1}Y" title="\bg_white \epsilon_X=-A^{-1}\epsilon_AX=-A^{-1}\epsilon_AA^{-1}Y" />
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;\varepsilon_X=-A^{-1}\varepsilon_AX=-A^{-1}\varepsilon_AA^{-1}Y"/>
+
+両方に分散を求める場合、Xの分散は以下の式となる
+
+<img src="https://latex.codecogs.com/gif.image?\dpi{200}&space;\bg_white&space;V(\varepsilon_X)=(A^{-1})^{\odot&space;2}\cdot\varepsilon_A\cdot&space;X^{\odot&space;2}" title="\bg_white V(\varepsilon_X)=(A^{-1})^{\odot 2}\cdot\varepsilon_A\cdot X^{\odot 2}" />
+
