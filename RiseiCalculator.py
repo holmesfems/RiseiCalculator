@@ -37,7 +37,7 @@ class RiseiCalculator(object):
                  TargetServer = 'CN',
                  update=False,
                  banned_stages={},
-#                 expValue=30,
+                 expValue=30,
                  ConvertionDR=0.18,
                  minTimes = 1000,
                  display_main_only=True):
@@ -72,6 +72,8 @@ class RiseiCalculator(object):
             '凝胶', '聚合凝胶',
             '炽合金', '炽合金块',
             '晶体元件', '晶体电路',
+            '半自然溶剂','精炼溶剂',
+            '化合切削液','切削原液',
             '聚合剂', '双极纳米片', 'D32钢','晶体电子单元',
             '技巧概要·卷1', '技巧概要·卷2', '技巧概要·卷3']
         self.name_to_index = {x:self.ValueTarget.index(x) for x in self.ValueTarget}
@@ -118,6 +120,8 @@ class RiseiCalculator(object):
         AllstageList = get_json("stages")
         #イベントステージを除外
         MainStageList = [x for x in AllstageList if x["stageType"] in ["MAIN","SUB"]]
+        #常設イベントステージ
+        MainStageList += [x for x in AllstageList if x["stageType"] in ["ACTIVITY"] and "permanent" in x["zoneId"]]
         #print(MainStageList)
         stageFilter = ",".join([x["stageId"] for x in MainStageList])
         itemFilter = ",".join([self.item_name_to_id["zh"][x] for x in self.ValueTarget])
@@ -235,43 +239,43 @@ class RiseiCalculator(object):
         #'Stages' 'Items'の他に、試行回数条件を満たしたステージIdのみを入れる'ValidIds'も追加される
         self.stage_Category_dict = {
             '源岩':{
-                'Stages':['R8-3','4-6','7-2','6-5','5-1','2-4','S2-12','S3-7','5-10','S5-1','S6-2','1-7','7-16','7-6'], \
+                'Stages':['R8-3','4-6','7-2','6-5','5-1','2-4','S2-12','S3-7','5-10','S5-1','S6-2','1-7','7-16','7-6','9-13','SV-7','RI-6'], \
                 'Items':['源岩', '固源岩', '固源岩组', '提纯源岩'] 
             },
             '装置':{
-                'Stages':['4-10','7-9','7-15','5-10','6-16','4-10','M8-8','7-9','3-4','S3-4','6-11'],
+                'Stages':['4-10','7-9','7-15','5-10','6-16','4-10','M8-8','7-9','3-4','S3-4','6-11','9-10','SV-9'],
                 'Items':['破损装置', '装置', '全新装置', '改量装置'] 
             },
             '酯':{
-                'Stages':['6-4','3-8','7-4','5-3','2-6','S3-2','6-5','1-8'],
+                'Stages':['6-4','3-8','7-4','5-3','2-6','S3-2','6-5','1-8','9-7','WD-6'],
                 'Items':['酯原料', '聚酸酯', '聚酸酯组', '聚酸酯块']
             },
             '糖':{
-                'Stages':['5-2','4-2','M8-7','7-12','6-3','2-5','7-6'],
+                'Stages':['5-2','4-2','M8-7','7-12','6-3','2-5','7-6','9-5','DM-6','OF-F3','RI-7'],
                 'Items':['代糖', '糖', '糖组', '糖聚块']
             },
             '异铁':{
-                'Stages':['5-5','S4-1','7-18','6-10','2-8','S3-3','M8-1','5-7'],
+                'Stages':['5-5','S4-1','7-18','6-10','2-8','S3-3','M8-1','5-7','9-16','9-17','DM-8'],
                 'Items':['异铁碎片', '异铁', '异铁组', '异铁块']
             },
             '酮':{
-                'Stages':['4-5','5-8','JT8-3','3-1','7-14','6-8','3-7','7-18','6-16','7-12'],
+                'Stages':['4-5','5-8','JT8-3','3-1','7-14','6-8','3-7','7-18','6-16','7-12','WD-7','TW-7'],
                 'Items':['双酮', '酮凝集', '酮凝集组', '酮阵列']
             },
             '醇':{
-                'Stages':['4-4','R8-2','7-5','6-11','5-4','2-9'],
+                'Stages':['4-4','R8-2','7-5','6-11','5-4','2-9','9-9','DM-7','GT-5'],
                 'Items':['扭转醇', '白马醇']
             },
             '锰':{
-                'Stages':['4-7','6-2','R8-10','7-16','3-2','5-6'],
+                'Stages':['4-7','6-2','R8-10','7-16','3-2','5-6','9-15','OF-F4'],
                 'Items':['轻锰矿', '三水锰矿']
             },
             '研磨石':{
-                'Stages':['7-17','4-8','5-7','3-3','6-14'],
+                'Stages':['7-17','4-8','5-7','3-3','6-14','9-16','GT-6','TW-8'],
                 'Items':['研磨石', '五水研磨石']
             },
             'RMA':{
-                'Stages':['4-9','6-15','R8-9','7-10','2-10'],
+                'Stages':['4-9','6-15','R8-9','7-10','2-10','9-19','WD-8','RI-8'],
                 'Items':['RMA70-12', 'RMA70-24']
             },
             '凝胶':{
@@ -279,13 +283,23 @@ class RiseiCalculator(object):
                 'Items':['凝胶', '聚合凝胶']
             },
             '炽合金':{
-                'Stages':['R8-7','S5-8','6-12','S3-6'],
+                'Stages':['R8-7','S5-8','6-12','S3-6','9-12','TW-6'],
                 'Items':['炽合金', '炽合金块']
             },
             '晶体':{
-                'Stages':['R8-11','S5-9','S3-7'],
+                'Stages':['R8-11','S5-9','S3-7','9-14','SV-8'],
                 'Items':['晶体元件', '晶体电路']
+            },
+            
+            '溶剂':{
+                'Stages':['9-18','9-4'],
+                'Items':['半自然溶剂','精炼溶剂']
+            },
+            '切削液':{
+                'Stages':['9-6'],
+                'Items':['化合切削液','切削原液']
             }
+            
         }
         #カテゴリキー 基準選びはカテゴリ毎に一つだけ抽選される
         self.stage_Category_keys = list(self.stage_Category_dict.keys())
@@ -302,6 +316,7 @@ class RiseiCalculator(object):
         """
         stage_dict = {}
         for item in self.matrix["matrix"]:
+            #print(item)
             if not item["stageId"] in stage_dict.keys():
                 #initialize
                 stage_info = {}
@@ -312,6 +327,7 @@ class RiseiCalculator(object):
                 stage_info["name"] = self.stageId_to_name[item["stageId"]]
                 stage_info["array"][self.name_to_index["龙门币1000"]] = stage_info["apCost"] *0.012
                 stage_info["minTimes"] = 0
+                stage_info["maxTimes"] = 0
                 stage_dict[item["stageId"]] = stage_info
             if item["times"] >= self.minTimes:
                 prob = item["quantity"]/item["times"]
@@ -322,6 +338,8 @@ class RiseiCalculator(object):
 
                 if stage_dict[item["stageId"]]["minTimes"] == 0 or item["times"] < stage_dict[item["stageId"]]["minTimes"]:
                     stage_dict[item["stageId"]]["minTimes"] = item["times"]
+                if stage_dict[item["stageId"]]["maxTimes"] == 0 or item["times"] > stage_dict[item["stageId"]]["maxTimes"]:
+                    stage_dict[item["stageId"]]["maxTimes"] = item["times"]
         #print(stage_dict)
         #試行回数条件を満たしているステージのみ出力&Id順にソートしておく
         self.stage_dict_all = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0])}
@@ -411,6 +429,7 @@ class RiseiCalculator(object):
         while(abs(det) < 50):
             seeds = [-1]*stages_need
             for i in range(stages_need):
+                print(i,self.stage_Category_dict[self.stage_Category_keys[i]])
                 randomStageId = random.choice(self.stage_Category_dict[self.stage_Category_keys[i]]["ValidIds"])
                 seeds[i] = self.valid_stages_getindex[randomStageId]
             stageMatrix, stageRisei,stageDiv = self._getStageMatrix(seeds)
@@ -493,6 +512,7 @@ class RiseiCalculator(object):
             exclude_Videos_Values = seedValues[4:]
             for item in stage_toPrint:
                 print("マップ名:",self.stageId_to_name[item[0]])
+                print("試行数:",self.stage_dict[item[0]]["maxTimes"])
                 print("最小試行数:",self.stage_dict[item[0]]["minTimes"])
                 print("理性消費:",self.stage_dict[item[0]]["apCost"])
                 print("理性効率:",item[1])
@@ -509,7 +529,7 @@ class RiseiCalculator(object):
             '糖组','异铁组','酮凝集组',
             '扭转醇','轻锰矿','研磨石',
             'RMA70-12','凝胶','炽合金',
-            '晶体元件'
+            '晶体元件','半自然溶剂','化合切削液'
         ]
         ticket_efficiency2 = {x:name_to_Value[x][0]/Price[x] for x in Item_rarity2}
         ticket_efficiency2_sorted = {key:(value,xSD95[self.name_to_index[key]]/Price[key]) for key,value in sorted(ticket_efficiency2.items(),key=lambda x:x[1],reverse=True)}
@@ -523,7 +543,7 @@ class RiseiCalculator(object):
             '糖聚块','异铁块','酮阵列', 
             '白马醇','三水锰矿','五水研磨石',
             'RMA70-24','聚合凝胶','炽合金块',
-            '晶体电路'
+            '晶体电路','精炼溶剂','切削原液'
         ]
         ticket_efficiency3 = {x:name_to_Value[x][0]/Price[x] for x in Item_rarity3}
         ticket_efficiency3_sorted = {key:(value,xSD95[self.name_to_index[key]]/Price[key]) for key,value in sorted(ticket_efficiency3.items(),key=lambda x:x[1],reverse=True)}
@@ -556,4 +576,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
