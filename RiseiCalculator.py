@@ -40,6 +40,7 @@ class RiseiCalculator(object):
                  expValue=30,
                  ConvertionDR=0.18,
                  minTimes = 1000,
+                 baseMinTimes = 3000,
                  display_main_only=True):
         """
         Object initialization.
@@ -56,6 +57,7 @@ class RiseiCalculator(object):
         self.display_main_only = display_main_only
         self.ConvertionDR = ConvertionDR
         self.minTimes = minTimes
+        self.baseMinTimes = baseMinTimes
         self.TargetServer = TargetServer
         self.ValueTarget = ['基础作战记录', '初级作战记录', '中级作战记录', '高级作战记录', 
             '赤金','龙门币1000',
@@ -344,11 +346,15 @@ class RiseiCalculator(object):
         #試行回数条件を満たしているステージのみ出力&Id順にソートしておく
         self.stage_dict_all = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0])}
         self.stage_dict = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0]) if value["minTimes"] >= self.minTimes}
+        self.stage_baseDict = {key:value for key,value in sorted(stage_dict.items(),key=lambda x:x[0]) if value["minTimes"] >= self.baseMinTimes}
         self.valid_stages = list(self.stage_dict.keys())
         self.valid_stages_getindex = {x:self.valid_stages.index(x) for x in self.valid_stages}
+        self.valid_baseStages = list(self.stage_baseDict.keys())
+        self.valid_baseStages_getindex = {x:self.valid_stages.index(x) for x in self.valid_baseStages}
         #add 'ValidIds' for StageCategory
         for item in self.stage_Category_keys:
             self.stage_Category_dict[item]['ValidIds'] = [x for x in self.valid_stages if self.stage_dict[x]["name"] in self.stage_Category_dict[item]['Stages']]
+            self.stage_Category_dict[item]['BaseIds'] = [x for x in self.valid_baseStages if self.stage_baseDict[x]["name"] in self.stage_Category_dict[item]['Stages']]
 
     #seedsからステージのドロ率行列を取得
     #seedsは選ぶ基準ステージのvalid_stages内のindexを意味している
@@ -391,6 +397,12 @@ class RiseiCalculator(object):
         #理性効率=Sum(理性価値×ドロ率)/理性消費
         #効率が1より上回るステージがあれば、まだ最適ではないと言える
         return {x:np.dot(valueArray,self.stage_dict[x]["array"].T)/self.stage_dict[x]["apCost"] for x in self.valid_stages}
+
+    def _getBaseStageValues(self,valueArray):
+        #解いた理性価値を使い、ステージごとの理性効率を求める
+        #理性効率=Sum(理性価値×ドロ率)/理性消費
+        #効率が1より上回るステージがあれば、まだ最適ではないと言える
+        return {x:np.dot(valueArray,self.stage_dict[x]["array"].T)/self.stage_dict[x]["apCost"] for x in self.valid_baseStages}
     
     def _getStageValueSD95(self,vstackTuple,divStackTuple,valueArray,seeds):
         probMatrix = np.vstack(vstackTuple)
@@ -430,7 +442,7 @@ class RiseiCalculator(object):
             seeds = [-1]*stages_need
             for i in range(stages_need):
                 print(i,self.stage_Category_dict[self.stage_Category_keys[i]])
-                randomStageId = random.choice(self.stage_Category_dict[self.stage_Category_keys[i]]["ValidIds"])
+                randomStageId = random.choice(self.stage_Category_dict[self.stage_Category_keys[i]]["BaseIds"])
                 seeds[i] = self.valid_stages_getindex[randomStageId]
             stageMatrix, stageRisei,stageDiv = self._getStageMatrix(seeds)
             det = self._detMatrix((ConvertionMatrix,ConstStageMatrix,stageMatrix))
@@ -439,7 +451,7 @@ class RiseiCalculator(object):
         seedValues = self._getValues((ConvertionMatrix,ConstStageMatrix,stageMatrix),[ConvertionRisei,ConstStageRisei,stageRisei])
         print("Seed Values:",seedValues)
         #print(self._getStageValues(seedValues))
-        stageValues = self._getStageValues(seedValues)
+        stageValues = self._getBaseStageValues(seedValues)
         #理性効率の最大を求める これを1にするように後で調整
         maxValue = max(stageValues.items(),key=lambda x: x[1])
         if maxValue[1] > 1+1e-5:
@@ -468,7 +480,7 @@ class RiseiCalculator(object):
                 if(abs(det) < 1):
                     continue
                 newSeedValues = self._getValues((ConvertionMatrix,ConstStageMatrix,newMatrix),[ConvertionRisei,ConstStageRisei,newRisei])
-                newStageValues = self._getStageValues(newSeedValues)
+                newStageValues = self._getBaseStageValues(newSeedValues)
                 newMaxValue = max(newStageValues.items(),key=lambda x:x[1])
                 maxValuesDict[item]=newMaxValue
             #最大理性効率が最も小さいものが、一番良い差し替え
@@ -570,7 +582,7 @@ class RiseiCalculator(object):
         print("基準マップデータをBaseStages.csvに保存しました")
 
 def main():
-    rc = RiseiCalculator(minTimes=800)
+    rc = RiseiCalculator(minTimes=300)
     rc.Calc()
     #print(rc.convert_rules)
 
